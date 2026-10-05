@@ -1,0 +1,2 @@
+"""Player session inventory service."""
+
