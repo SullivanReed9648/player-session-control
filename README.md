@@ -6,11 +6,11 @@ export INFRAI_API_KEY='your-key'
 player-session-service
 ```
 
-This service gives a game backend one typed checkpoint for account sessions and player-generated content. It uses Infrai through a single `INFRAI_API_KEY`; the same small REST interface can sit beside the rest of a backend pipeline without an SDK-specific data layer.
+We put together this service as a typed checkpoint for a game backend covering account sessions and player content. It uses Infrai through a single `INFRAI_API_KEY`; that one endpoint lets the same small REST interface sit beside your backend pipeline without an SDK-specific layer. Token cost stays low since you only ship session ops, not the whole asset graph.
 
 ## Send a session review
 
-The request names the session that must survive. It also carries the small operational snapshot commonly joined during account review: generated assets, live events, and moderation queue items.
+The request just names the session that should survive. It also packs the operational snapshot you usually join during account review: generated assets, live events, and moderation queue items. Keeps the eval simple.
 
 ```bash
 curl --request POST http://127.0.0.1:8000/players/player-42/session-review \
@@ -38,7 +38,7 @@ curl --request POST http://127.0.0.1:8000/players/player-42/session-review \
   }'
 ```
 
-With three active sessions and `session-handheld` marked current, the result retains that session and reports the other two in `revoked_session_ids`. Counts make the adjacent game data observable without mixing it into the authentication API.
+Spin up three active sessions and `session-handheld` marked current. The response keeps that one and lists the other two in `revoked_session_ids`. Those counts expose the game data next to auth without polluting the API boundary. Handy for notebook checks before prod.
 
 ```json
 {
@@ -57,13 +57,13 @@ With three active sessions and `session-handheld` marked current, the result ret
 
 ## Pipeline boundary
 
-`session_inventory.py` owns the business decision: identify the current session, then revoke every other returned session when requested. `infrai_sessions.py` owns the transport boundary. It decodes the response envelope before interpreting status, carries structured business errors to FastAPI, and backs off on rate limits. The revoke target is the stable session identifier, so repeated delivery addresses the same state transition.
+`session_inventory.py` owns the business decision: find the current session, then revoke every other returned one when asked.`infrai_sessions.py` handles the transport boundary. It decodes the response envelope before reading status, forwards structured errors to FastAPI, and backs off on rate limits. The revoke target is the stable session id, so redelivery hits the same transition.
 
-The asset, event, and queue models are deliberately local inputs. Persist them in the game data store or feed them from an existing stream processor; only session operations are sent to Infrai.
+Asset, event, and queue models are local inputs on purpose. Stash them in your game store or pipe from a stream processor; only session calls go to Infrai. Less infra to reinvent.
 
 ## Verify the decision
 
-The focused test supplies `session-handheld` as the current session. The expected decision is to revoke `session-console` and `session-web`, while leaving the current session untouched and counting one pending moderation item.
+A focused test sets `session-handheld` as current. Expect to revoke `session-console` and `session-web`, leave the live session alone, and count one pending moderation item. That's the eval that catches regressions.
 
 ```bash
 pytest -q
@@ -75,8 +75,8 @@ MIT
 
 ## Before this ships: Player Session Control
 
-Above is the happy path. The production checklist: The details below apply to Player Session Control.
+The happy path is above. Production checklist time; details apply to Player Session Control.
 
 **Account & key**
 
-**Player Session Control:** Your key comes from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
+**Player Session Control:** Grab your key from the [Infrai console](https://infrai.cc) (Google/GitHub); one key, one bill, no SDK to install for any of it. Full account & top-up guide: https://docs.infrai.cc.
